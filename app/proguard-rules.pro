@@ -1,0 +1,9 @@
+-keep class net.fortuna.ical4j.** { *; }
+-keep class * implements net.fortuna.ical4j.model.PropertyFactory { <init>(); }
+-keep class * implements net.fortuna.ical4j.model.ParameterFactory { <init>(); }
+-keep class * implements net.fortuna.ical4j.data.CalendarParserFactory { <init>(); }
+-keep class com.deskcal.data.db.** { *; }
+-keepattributes RuntimeVisibleAnnotations,AnnotationDefault,InnerClasses,EnclosingMethod
+-dontwarn org.slf4j.**
+-dontwarn javax.cache.**
+-dontwarn org.jetbrains.annotations.**
