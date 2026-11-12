@@ -43,7 +43,7 @@ sealed class CalDavException(message: String) : Exception(message) {
                 is Auth -> "Wrong username or password (HTTP 401/403)."
                 is NotFound -> "Not found on the server (HTTP 404). Check the base URL."
                 is HttpError -> "Server returned HTTP ${c.code}."
-                is Parse -> "Could not parse the server response."
+                is Parse -> "Could not parse the server response: ${c.message}"
             }
         }
     }

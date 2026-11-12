@@ -10,10 +10,19 @@ import java.io.StringReader
 import javax.xml.parsers.DocumentBuilderFactory
 
 fun parseXml(xml: String): Document {
+    if ("<!DOCTYPE" in xml.uppercase()) {
+        throw IllegalArgumentException("DOCTYPE declarations are not allowed")
+    }
     val factory = DocumentBuilderFactory.newInstance()
     factory.isNamespaceAware = true
-    factory.isXIncludeAware = false
-    factory.isExpandEntityReferences = false
+    try {
+        factory.isXIncludeAware = false
+    } catch (_: Exception) {
+    }
+    try {
+        factory.isExpandEntityReferences = false
+    } catch (_: Exception) {
+    }
     try {
         factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
     } catch (_: Exception) {
