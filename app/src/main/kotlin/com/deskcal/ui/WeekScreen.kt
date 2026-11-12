@@ -21,8 +21,9 @@ import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.pullrefresh.SwipeRefresh
-import androidx.compose.material.pullrefresh.rememberSwipeRefreshState
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -110,10 +111,11 @@ fun WeekScreen(viewModel: WeekViewModel, onOpenSettings: () -> Unit) {
                 .fillMaxSize()
                 .offset { shift },
         ) {
-            SwipeRefresh(
-                state = rememberSwipeRefreshState(isRefreshing = state.syncStatus is SyncStatus.Syncing),
+            val pullRefreshState = rememberPullRefreshState(
+                refreshing = state.syncStatus is SyncStatus.Syncing,
                 onRefresh = { viewModel.refresh() },
-            ) {
+            )
+            Box(Modifier.fillMaxSize().pullRefresh(pullRefreshState)) {
                 if (state.loading) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
@@ -127,6 +129,11 @@ fun WeekScreen(viewModel: WeekViewModel, onOpenSettings: () -> Unit) {
                         WeekPage(weekStart = weekStart, state = state)
                     }
                 }
+                PullRefreshIndicator(
+                    refreshing = state.syncStatus is SyncStatus.Syncing,
+                    state = pullRefreshState,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                )
             }
             StatusLine(
                 modifier = Modifier
