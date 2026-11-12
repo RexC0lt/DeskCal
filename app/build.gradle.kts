@@ -4,6 +4,20 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+import java.util.Properties
+
+val keystorePropsFile = rootProject.file("keystore.properties")
+val keystoreProps = Properties().apply {
+    if (keystorePropsFile.exists()) {
+        keystorePropsFile.inputStream().use { load(it) }
+    }
+}
+
+fun keystoreSetting(name: String): String? =
+    System.getenv(name)
+        ?: keystoreProps.getProperty(name)
+        ?: (project.findProperty(name) as String?)
+
 android {
     namespace = "com.deskcal"
     compileSdk = 34
@@ -16,11 +30,24 @@ android {
         versionName = "1.0.0"
     }
 
+    signingConfigs {
+        val storePath = keystoreSetting("DESKCAL_KEYSTORE_PATH")
+        if (!storePath.isNullOrBlank()) {
+            create("release") {
+                storeFile = file(storePath)
+                storePassword = keystoreSetting("DESKCAL_KEYSTORE_PASSWORD")
+                keyAlias = keystoreSetting("DESKCAL_KEY_ALIAS")
+                keyPassword = keystoreSetting("DESKCAL_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
         debug {
             isMinifyEnabled = false

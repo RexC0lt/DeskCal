@@ -21,6 +21,7 @@ local.properties
 # Keystores and signing material
 keystore/
 keystores/
+keystore.properties
 *.jks
 *.keystore
 *.p12

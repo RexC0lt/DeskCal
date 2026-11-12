@@ -148,6 +148,54 @@ also fetches data for the weeks you look at.
 - WorkManager's minimum periodic interval is 15 minutes; the 5-minute option is honoured by the
   in-app loop while the app is running (which, on a desk phone, is always).
 
+## Publishing a release on GitHub
+
+1. Bump `versionCode` / `versionName` in `app/build.gradle.kts` for each release.
+2. Build an installable APK. Android requires every APK to be signed, so either:
+   - **Recommended — sign the release with your own keystore** (sideload updates must keep
+     the same signature, so keep the keystore safe and backed up):
+     ```bash
+     keytool -genkeypair -v -keystore deskcal-release.jks -alias deskcal \
+       -keyalg RSA -keysize 2048 -validity 10000
+     ```
+     Then create a `keystore.properties` file in the repo root (**never commit it** —
+     `keystore.properties`, `*.jks`, `*.keystore` are already in `.gitignore`; you can also
+     use environment variables with the same names):
+     ```
+     DESKCAL_KEYSTORE_PATH=/absolute/path/to/deskcal-release.jks
+     DESKCAL_KEYSTORE_PASSWORD=...
+     DESKCAL_KEY_ALIAS=deskcal
+     DESKCAL_KEY_PASSWORD=...
+     ```
+     ```bash
+     ./gradlew assembleRelease
+     # -> app/build/outputs/apk/release/app-release.apk
+     ```
+   - **Quick alternative — ship the debug APK** (signed with the Android debug key, fine for
+     a personal desk phone):
+     ```bash
+     ./gradlew assembleDebug
+     # -> app/build/outputs/apk/debug/app-debug.apk
+     ```
+3. Tag and create the release (requires `gh` authenticated, `gh auth login`):
+   ```bash
+   ./scripts/make-release.sh v1.0.0
+   ```
+   The script picks the release APK when signing is configured (otherwise the debug APK),
+   creates and pushes the git tag, and runs `gh release create` with the APK attached.
+   Equivalent manual steps:
+   ```bash
+   git tag v1.0.0 && git push origin v1.0.0
+   gh release create v1.0.0 app/build/outputs/apk/release/app-release.apk \
+     --title "DeskCal v1.0.0" \
+     --notes "Always-on desk calendar synced from Radicale. See the README for sideload instructions."
+   ```
+   You can also create the release in the GitHub web UI: **Releases → Draft a new release →
+   choose/create the tag → drag the APK onto the page → Publish release**.
+4. Users download the APK from the release page and install it on the phone (allow
+   "install unknown apps" for the browser or file manager, or use
+   `adb install app-release.apk`).
+
 ## License
 
 MIT
