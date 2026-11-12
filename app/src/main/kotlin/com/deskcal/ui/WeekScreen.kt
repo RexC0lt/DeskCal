@@ -17,12 +17,9 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.pullrefresh.SwipeRefresh
-import androidx.compose.material.pullrefresh.rememberSwipeRefreshState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,6 +31,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,6 +43,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -61,7 +61,7 @@ import com.deskcal.week.buildDays
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterialApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun WeekScreen(viewModel: WeekViewModel, onOpenSettings: () -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -110,10 +110,14 @@ fun WeekScreen(viewModel: WeekViewModel, onOpenSettings: () -> Unit) {
                 .fillMaxSize()
                 .offset { shift },
         ) {
-            SwipeRefresh(
-                state = rememberSwipeRefreshState(isRefreshing = state.syncStatus is SyncStatus.Syncing),
-                onRefresh = { viewModel.refresh() },
-            ) {
+            val pullState = rememberPullToRefreshState()
+            if (pullState.isRefreshing) {
+                LaunchedEffect(true) {
+                    viewModel.refresh()
+                    pullState.endRefresh()
+                }
+            }
+            Box(Modifier.nestedScroll(pullState.nestedScrollConnection)) {
                 if (state.loading) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
@@ -127,6 +131,10 @@ fun WeekScreen(viewModel: WeekViewModel, onOpenSettings: () -> Unit) {
                         WeekPage(weekStart = weekStart, state = state)
                     }
                 }
+                PullToRefreshContainer(
+                    state = pullState,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                )
             }
             StatusLine(
                 modifier = Modifier
