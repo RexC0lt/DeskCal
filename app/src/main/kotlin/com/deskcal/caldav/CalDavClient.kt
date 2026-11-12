@@ -39,6 +39,12 @@ class CalDavClient private constructor(
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
             .callTimeout(60, TimeUnit.SECONDS)
+            // DAV discovery relies on redirects (e.g. /.well-known/caldav -> /user/).
+            // OkHttp converts a redirected PROPFIND/REPORT into a GET, which makes the
+            // server answer with HTML instead of XML. Redirects are therefore followed
+            // manually, preserving the original request method.
+            .followRedirects(false)
+            .followSslRedirects(false)
         if (trustSelfSigned) {
             val trustManager = object : X509TrustManager {
                 override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
@@ -94,11 +100,30 @@ class CalDavClient private constructor(
         rangeEnd: Long,
     ): List<String> = withContext(Dispatchers.IO) {
         val body = calendarQueryBody(rangeStart, rangeEnd).toRequestBody(XML_MEDIA_TYPE)
-        val request = newRequest(calendarUrl)
-            .method("REPORT", body)
-            .header("Depth", "1")
-            .build()
-        val xml = execute(request)
+        var currentUrl = calendarUrl
+        var redirects = 0
+        var xml = ""
+        while (true) {
+            val request = newRequest(currentUrl)
+                .method("REPORT", body)
+                .header("Depth", "1")
+                .build()
+            val (code, location, text) = executeRaw(request)
+            if (code == 207 || code == 200) {
+                xml = text
+                break
+            }
+            if (code in 300..399 && redirects < MAX_REDIRECTS) {
+                val target = location?.let { currentUrl.resolve(it) }
+                if (target == null) {
+                    throw CalDavException.HttpError(code, "Redirect without valid location (HTTP $code)")
+                }
+                currentUrl = target
+                redirects++
+                continue
+            }
+            throw httpError(code, currentUrl)
+        }
         val doc = try {
             parseXml(xml)
         } catch (e: Exception) {
@@ -111,12 +136,31 @@ class CalDavClient private constructor(
 
     private suspend fun propfind(url: HttpUrl, depth: Int): org.w3c.dom.Document =
         withContext(Dispatchers.IO) {
-            val body = PROPFIND_BODY.toRequestBody(XML_MEDIA_TYPE)
-            val request = newRequest(url)
-                .method("PROPFIND", body)
-                .header("Depth", depth.toString())
-                .build()
-            val xml = execute(request)
+            var currentUrl = url
+            var redirects = 0
+            var xml = ""
+            while (true) {
+                val body = PROPFIND_BODY.toRequestBody(XML_MEDIA_TYPE)
+                val request = newRequest(currentUrl)
+                    .method("PROPFIND", body)
+                    .header("Depth", depth.toString())
+                    .build()
+                val (code, location, text) = executeRaw(request)
+                if (code == 207 || code == 200) {
+                    xml = text
+                    break
+                }
+                if (code in 300..399 && redirects < MAX_REDIRECTS) {
+                    val target = location?.let { currentUrl.resolve(it) }
+                    if (target == null) {
+                        throw CalDavException.HttpError(code, "Redirect without valid location (HTTP $code)")
+                    }
+                    currentUrl = target
+                    redirects++
+                    continue
+                }
+                throw httpError(code, currentUrl)
+            }
             try {
                 parseXml(xml)
             } catch (e: Exception) {
@@ -124,19 +168,17 @@ class CalDavClient private constructor(
             }
         }
 
-    private suspend fun execute(request: Request): String = withContext(Dispatchers.IO) {
+    private fun executeRaw(request: Request): Triple<Int, String?, String> {
         client.newCall(request).execute().use { response ->
-            val code = response.code
-            val body = response.body?.string().orEmpty()
-            when {
-                code == 207 || code == 200 -> body
-                code == 401 || code == 403 -> throw CalDavException.Auth("HTTP $code")
-                code == 404 -> throw CalDavException.NotFound("HTTP 404 for ${request.url}")
-                code in 300..399 -> throw CalDavException.HttpError(code, "Unexpected redirect (HTTP $code)")
-                code >= 400 -> throw CalDavException.HttpError(code, "HTTP $code for ${request.url}")
-                else -> body
-            }
+            val text = response.body?.string().orEmpty()
+            return Triple(response.code, response.header("Location"), text)
         }
+    }
+
+    private fun httpError(code: Int, url: HttpUrl): CalDavException = when {
+        code == 401 || code == 403 -> CalDavException.Auth("HTTP $code")
+        code == 404 -> CalDavException.NotFound("HTTP 404 for $url")
+        else -> CalDavException.HttpError(code, "HTTP $code for $url")
     }
 
     private fun newRequest(url: HttpUrl): Request.Builder =
@@ -147,6 +189,7 @@ class CalDavClient private constructor(
 
     companion object {
         private val XML_MEDIA_TYPE = "application/xml; charset=utf-8".toMediaType()
+        private const val MAX_REDIRECTS = 5
 
         fun create(
             serverUrl: String,
