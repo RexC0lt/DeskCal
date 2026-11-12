@@ -249,7 +249,7 @@ private fun StatusLine(modifier: Modifier = Modifier, state: WeekUiState) {
     val (statusText, statusColor) = when {
         !state.online -> "Offline — showing cached data" to DeskCalWarn
         state.syncStatus is SyncStatus.Syncing -> "Syncing…" to MaterialTheme.colorScheme.primary
-        state.syncStatus is SyncStatus.Error -> "Sync error: ${(state.syncStatus as SyncStatus.Error).message}" to DeskCalError
+        state.syncStatus is SyncStatus.Error -> "Sync error: ${state.syncStatus.message}" to DeskCalError
         else -> "OK" to DeskCalOk
     }
     Surface(modifier = modifier, color = MaterialTheme.colorScheme.surface) {

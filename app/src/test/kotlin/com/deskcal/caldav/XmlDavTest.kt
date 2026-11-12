@@ -2,9 +2,9 @@ package com.deskcal.caldav
 
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFailsWith
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.test.assertFailsWith
 import java.util.Calendar
 import java.util.TimeZone
 
